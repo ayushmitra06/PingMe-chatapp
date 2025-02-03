@@ -3,6 +3,9 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import { Users } from "lucide-react";
+import toast from "react-hot-toast";
+import notificationSound from "/notification.wav";
+
 
 const Sidebar = () => {
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
@@ -14,10 +17,16 @@ const Sidebar = () => {
     getUsers();
   }, [getUsers]);
 
-  const filteredUsers = showOnlineOnly
+  const filteredUsers = (showOnlineOnly
     ? users.filter((user) => onlineUsers.includes(user._id))
-    : users;
+    : users
+  ).sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
 
+  const playNotificationSound = () => {
+    const audio = new Audio(notificationSound);
+    audio.play();
+  };
+  
   if (isUsersLoading) return <SidebarSkeleton />;
 
   return (

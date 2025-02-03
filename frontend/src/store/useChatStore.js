@@ -2,6 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import notificationSound from "/notification.wav";
 
 
 export const useChatStore = create((set, get) => ({
@@ -53,20 +54,26 @@ export const useChatStore = create((set, get) => ({
   },
 
   subscribeToMessages: () => {
-    const {selectedUser} = get();
-    if(!selectedUser) return;
-
+    const { selectedUser } = get();
+    if (!selectedUser) return;
+  
     const socket = useAuthStore.getState().socket;
-
-    
+  
     socket.on("newMessage", (newMessage) => {
+      // Check if the new message is from the selected user
       const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-      if(!isMessageSentFromSelectedUser) return;
+      if (!isMessageSentFromSelectedUser) return;
+  
+      // Update messages in the store
       set({
         messages: [...get().messages, newMessage],
-      })
-    })
-  },
+      });
+  
+      // Optionally, play a notification sound
+      playNotificationSound();
+    });
+  }
+  ,
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
@@ -77,3 +84,8 @@ export const useChatStore = create((set, get) => ({
     set({ selectedUser: user });
   },
 }));
+
+const playNotificationSound = () => {
+  const audio = new Audio(notificationSound);
+  audio.play();
+};

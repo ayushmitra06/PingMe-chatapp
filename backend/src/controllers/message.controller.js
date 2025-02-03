@@ -4,16 +4,33 @@ import Message from "../models/message.model.js";
 import User from "../models/user.model.js";
 
 export const getUsersForSidebar = async (req, res) => {
-    try {
-        const loggedInUserId = req.user._id;
-        const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+  try {
+    const users = await User.find({ _id: { $ne: req.user.id } }) // Exclude self
+      .lean();
 
-        res.status(200).json(filteredUsers);
-    } catch (error) {
-        console.log("Error in getUsersForSidebar: ", error.message);
-        res.status(500).json({ message: "Internal server error" });
+    // Get the latest message timestamp for each user
+    for (let user of users) {
+      const lastMessage = await Message.findOne({
+        $or: [
+          { senderId: req.user.id, receiverId: user._id },
+          { senderId: user._id, receiverId: req.user.id },
+        ],
+      })
+        .sort({ createdAt: -1 }) // Latest message first
+        .select("createdAt");
+
+      user.lastMessageAt = lastMessage ? lastMessage.createdAt : new Date(0);
     }
-}
+
+    // Sort users based on the latest message timestamp (descending order)
+    users.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
+
+    res.status(201).json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching users" });
+  }
+};
+
 
 export const getMessages = async (req, res) => {
     try {
@@ -55,6 +72,9 @@ export const sendMessage = async (req, res) => {
         });
 
         await newMessage.save();
+
+        // Emit real-time event to the receiver
+        io.to(receiverId).emit("newMessage", { senderId, text });
 
         //realtime functionality goes here -> socket.io
         const receiverSocketId = getReceiverSocketId(receiverId);
